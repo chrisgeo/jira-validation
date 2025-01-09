@@ -1,0 +1,25 @@
+validate-jira-issue-existence:
+  stage: validate
+  script:
+    # Extract the JIRA issue ID from the Merge Request Title
+    - echo "Validating JIRA issue existence..."
+    - JIRA_ISSUE=$(echo "$CI_MERGE_REQUEST_TITLE" | grep -oE "[A-Z]+-[0-9]+")
+    - |
+      if [[ -z "$JIRA_ISSUE" ]]; then 
+          echo "Error: No JIRA issue found in the merge request title."
+          exit 1; 
+      fi
+    - echo "Found JIRA Issue: $JIRA_ISSUE"
+
+    # Query the JIRA API to validate the issue exists
+    - RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -u "$JIRA_USERNAME:$JIRA_API_TOKEN" "https://your-jira-domain.atlassian.net/rest/api/2/issue/$JIRA_ISSUE")
+    - |
+      if [[ "$RESPONSE" -ne 200 ]]; then 
+          echo "Error: JIRA issue $JIRA_ISSUE does not exist."
+          exit 1
+      fi
+    - echo "JIRA issue $JIRA_ISSUE exists and is valid."
+  rules:
+    - if: $CI_MERGE_REQUEST_TITLE =~ /[A-Z]+-[0-9]+/
+      when: always
+    - when: never

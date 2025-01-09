@@ -1,0 +1,47 @@
+auto-create-and-link-jira:
+  stage: validate
+  script:
+    # Extract JIRA issue key from the MR title
+    - echo "Checking for JIRA issue in merge request title..."
+    - JIRA_ISSUE=$(echo "$CI_MERGE_REQUEST_TITLE" | grep -oE "[A-Z]+-[0-9]+")
+
+    # If no JIRA issue exists, create one
+    - |
+      if [[ -z "$JIRA_ISSUE" ]]; then
+        echo "No JIRA issue found. Creating one..."
+        ISSUE_RESPONSE=$(curl -s -X POST \
+            -H "Authorization: Basic $(echo -n $JIRA_USERNAME:$JIRA_API_TOKEN | base64)" \
+            -H "Content-Type: application/json" \
+            -d '{
+                    "fields": {
+                    "project": { "key": "PROJECT_KEY" },
+                    "summary": "Auto-created issue for merge request: '"$CI_MERGE_REQUEST_TITLE"'",
+                    "description": "This issue was automatically created for the merge request: '"$CI_MERGE_REQUEST_TITLE"'.",
+                    "issuetype": { "name": "Task" },
+                    "labels": ["auto-created"]
+                    }
+                }' \
+            https://${DOMAIN}.atlassian.net/rest/api/2/issue)
+
+        # Extract the new issue key
+        JIRA_ISSUE=$(echo $ISSUE_RESPONSE | jq -r '.key')
+        echo "Created JIRA issue: $JIRA_ISSUE"
+
+        # Fail the pipeline if the issue creation fails
+        if [[ -z "$JIRA_ISSUE" ]]; then
+            echo "Failed to create JIRA issue."
+            exit 1
+        fi
+
+        # Update the merge request title to include the new JIRA issue
+        curl -s -X PUT \
+            -H "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"title": "'"$JIRA_ISSUE $CI_MERGE_REQUEST_TITLE"'"}' \
+            "https://gitlab.com/api/v4/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID"
+      fi
+
+  rules:
+    - if: $CI_MERGE_REQUEST_TITLE =~ /[A-Z]+-[0-9]+/
+      when: always
+    - when: never

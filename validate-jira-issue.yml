@@ -1,0 +1,11 @@
+validate-jira-issue:
+    script: |
+        if [[ ! "$CI_MERGE_REQUEST_TITLE" =~ [A-Z]+-[0-9]+ ]]; then 
+            echo "Merge request title must include a JIRA ticket (e.g., [JIRA-123])."; 
+            exit 1; 
+        fi
+
+    rules:
+        - if: '$CI_MERGE_REQUEST_TITLE =~ /[A-Z]+-[0-9]+/'
+          when: always
+        - when: never

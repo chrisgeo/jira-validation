@@ -1,0 +1,15 @@
+validate-jira-issue:
+    stage: validate
+    script:
+        # Check if the merge request title contains a JIRA issue ID
+        - echo "Validating JIRA issue in Merge Request Title..."
+        - 'if [[ ! "$CI_MERGE_REQUEST_TITLE" =~ [A-Z]+-[0-9]+ ]]; then echo "Error: Merge request title must include a JIRA ticket (e.g., [PROJECT-123])."; exit 1; fi'
+
+        # Check commit messages in the merge request for JIRA issue IDs
+        - echo "Validating JIRA issue in commit messages..."
+        - 'missing_jira=$(git log $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME ^$CI_MERGE_REQUEST_TARGET_BRANCH_NAME --pretty=format:"%s" | grep -vE "[A-Z]+-[0-9]+")'
+        - 'if [[ -n "$missing_jira" ]]; then echo "Error: All commit messages must reference a JIRA issue (e.g., [PROJECT-123])."; echo "Missing JIRA issues in the following commits:"; echo "$missing_jira"; exit 1; fi'
+    rules:
+        - if: $CI_MERGE_REQUEST_TITLE =~ /[A-Z]+-[0-9]+/
+          when: always
+        - when: never
